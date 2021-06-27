@@ -14,11 +14,8 @@ static constexpr float MOVE_SPEED = 0.3;
 
 static const char* vertex_shader_source = "#version 450\n"
                                           "layout (location = 0) in vec2 position;"
-                                          "layout (location = 1) in vec2 uv;"
-                                          "out vec2 v_uv;"
                                           "void main() {"
-                                          "	v_uv = uv;"
-                                          "	gl_Position = vec4(position, 0.0, 1.0);"
+                                          "    gl_Position = vec4(position, 0.0, 1.0);"
                                           "}";
 
 void panic(const char* message)
@@ -187,9 +184,9 @@ GLuint create_program(const char* vertex_src, const char* fragment_src)
 GLuint create_vertex_buffer_object()
 {
     float data[] = {
-        -1.0f, 3.0f, 0.0f, 2.0f, // Top left
-        3.0, -1.0f, 2.0f, 0.0f, // Bottom right
-        -1.0f, -1.0f, 0.0f, 0.0f, // Bottom left
+        -1.0f, 3.0f, // Top left
+        3.0, -1.0f, // Bottom right
+        -1.0f, -1.0f, // Bottom left
     };
 
     GLuint vbo;
@@ -204,16 +201,10 @@ GLuint create_vertex_array_object(GLuint vbo)
     GLuint vao;
     glCreateVertexArrays(1, &vao);
 
-    glVertexArrayVertexBuffer(vao, 0, vbo, 0, 4 * sizeof(float));
-
+    glVertexArrayVertexBuffer(vao, 0, vbo, 0, 2 * sizeof(float));
     glEnableVertexArrayAttrib(vao, 0);
-    glEnableVertexArrayAttrib(vao, 1);
-
     glVertexArrayAttribFormat(vao, 0, 2, GL_FLOAT, GL_FALSE, 0);
-    glVertexArrayAttribFormat(vao, 1, 2, GL_FLOAT, GL_FALSE, 2 * sizeof(float));
-
     glVertexArrayAttribBinding(vao, 0, 0);
-    glVertexArrayAttribBinding(vao, 1, 0);
 
     return vao;
 }

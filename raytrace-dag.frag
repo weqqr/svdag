@@ -1,6 +1,5 @@
 #version 450
 
-in vec2 v_uv;
 out vec4 color;
 
 uniform vec3 u_position;
@@ -50,6 +49,8 @@ bool intersect(Box box, Ray ray, out float distance, out vec3 normal, in vec3 in
 }
 
 void main() {
+    vec2 uv = gl_FragCoord.xy / vec2(WIDTH, HEIGHT);
+
     vec3 origin = u_position; //vec3(-5, -5, -5);
     vec3 look_dir = u_look_dir; // normalize(vec3(1, 1, 1));
     vec3 U = normalize(cross(UP, -look_dir));
@@ -58,9 +59,7 @@ void main() {
     U *= 2.0 * 16.0 / 9.0;
     V *= 2.0;
 
-    vec3 viewport_origin = look_dir - U/2 - V/2;
-
-    vec3 dir = normalize(viewport_origin + v_uv.x * U + v_uv.y * V);
+    vec3 dir = normalize(look_dir + (uv.x - 0.5) * U + (uv.y - 0.5) * V);
 
     vec3 center = vec3(0, 0, 0);
     const vec3 radius = vec3(0.5, 0.5, 0.5);
