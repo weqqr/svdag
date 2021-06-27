@@ -124,13 +124,6 @@ DAG::DAG(const Map& map, uint32_t levels)
     m_level_count = levels;
     m_levels.resize(levels);
     build_svdag(map, m_levels, levels, 0, 0, 0);
-
-    /*size_t total_size = 0;
-    for (size_t i = 0; i < m_levels.size(); i++) {
-        std::cout << "Level " << i << " count=" << m_levels[i].size() << std::endl;
-        total_size += m_levels[i].size() * sizeof(DAGNode);
-    }
-    std::cout << "DAG Size=" << float(total_size) / 1024 / 1024 << " MiB" << std::endl;*/
 }
 
 bool DAG::get(uint32_t x, uint32_t y, uint32_t z) const {
@@ -158,3 +151,16 @@ bool DAG::get(uint32_t x, uint32_t y, uint32_t z) const {
     return (pointer & (1 << (x + 2*y + 4*z))) != 0;
 }
 
+size_t DAG::total_size() const
+{
+    size_t total_size = 0;
+    for (const auto& level : m_levels) {
+        total_size += level.size() * sizeof(DAGNode);
+    }
+    return total_size;
+}
+
+std::vector<uint32_t> DAG::flatten() const
+{
+    std::vector<uint32_t> output;
+}

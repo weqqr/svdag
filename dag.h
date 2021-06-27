@@ -38,6 +38,8 @@ class DAG {
 public:
     explicit DAG(const Map& map, uint32_t levels);
     bool get(uint32_t x, uint32_t y, uint32_t z) const;
+    size_t total_size() const;
+    std::vector<uint32_t> flatten() const;
 
     uint32_t m_level_count = 0;
     std::vector<std::vector<DAGNode>> m_levels;

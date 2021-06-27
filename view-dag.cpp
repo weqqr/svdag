@@ -12,12 +12,6 @@ static constexpr float PI = 3.1415926;
 static constexpr float SENSITIVITY = 0.1;
 static constexpr float MOVE_SPEED = 0.3;
 
-static const char* vertex_shader_source = "#version 450\n"
-                                          "layout (location = 0) in vec2 position;"
-                                          "void main() {"
-                                          "    gl_Position = vec4(position, 0.0, 1.0);"
-                                          "}";
-
 void panic(const char* message)
 {
     fprintf(stderr, "panic: %s\n", message);
@@ -181,12 +175,37 @@ GLuint create_program(const char* vertex_src, const char* fragment_src)
     return program;
 }
 
+GLuint create_compute_program(const char* compute_src)
+{
+    GLuint compute_shader = create_shader(compute_src, GL_COMPUTE_SHADER);
+
+    GLuint program = glCreateProgram();
+
+    glAttachShader(program, compute_shader);
+
+    glLinkProgram(program);
+
+    GLint success = GL_FALSE;
+    glGetProgramiv(program, GL_LINK_STATUS, &success);
+    if (success != GL_TRUE) {
+        int size = 0;
+        char log[INFO_LOG_SIZE];
+        glGetProgramInfoLog(program, INFO_LOG_SIZE, &size, log);
+
+        panic(log);
+    }
+
+    glDeleteShader(compute_shader);
+
+    return program;
+}
+
 GLuint create_vertex_buffer_object()
 {
     float data[] = {
-        -1.0f, 3.0f, // Top left
-        3.0, -1.0f, // Bottom right
-        -1.0f, -1.0f, // Bottom left
+        -1.0f, 3.0f, 0.0f, 2.0f, // Top left
+        3.0, -1.0f, 2.0f, 0.0f, // Bottom right
+        -1.0f, -1.0f, 0.0f, 0.0f // Bottom left
     };
 
     GLuint vbo;
@@ -201,12 +220,31 @@ GLuint create_vertex_array_object(GLuint vbo)
     GLuint vao;
     glCreateVertexArrays(1, &vao);
 
-    glVertexArrayVertexBuffer(vao, 0, vbo, 0, 2 * sizeof(float));
+    glVertexArrayVertexBuffer(vao, 0, vbo, 0, 4 * sizeof(float));
     glEnableVertexArrayAttrib(vao, 0);
+    glEnableVertexArrayAttrib(vao, 1);
     glVertexArrayAttribFormat(vao, 0, 2, GL_FLOAT, GL_FALSE, 0);
+    glVertexArrayAttribFormat(vao, 1, 2, GL_FLOAT, GL_FALSE, 2 * sizeof(float));
     glVertexArrayAttribBinding(vao, 0, 0);
+    glVertexArrayAttribBinding(vao, 1, 0);
 
     return vao;
+}
+
+GLuint create_texture(int width, int height)
+{
+    GLuint texture;
+    glGenTextures(1, &texture);
+    glActiveTexture(GL_TEXTURE0);
+    glBindTexture(GL_TEXTURE_2D, texture);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_REPEAT);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_REPEAT);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
+    glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA32F, width, height, 0, GL_RGBA, GL_FLOAT, NULL);
+    glBindImageTexture(0, texture, 0, GL_FALSE, 0, GL_WRITE_ONLY, GL_RGBA32F);
+
+    return texture;
 }
 
 class Renderer {
@@ -220,21 +258,27 @@ public:
     void render();
     GLFWwindow* get_window() const { return window; }
 
-    void set_uniform(const char* name, Vec3 value);
+    void set_uniform(GLint location, Vec3 value);
 
 private:
     GLFWwindow* window;
-    GLuint program;
+    GLuint fullscreen_program;
+    GLuint raytrace_program;
+    GLuint frame;
     GLuint vao;
     GLuint vbo;
 };
 
 Renderer::Renderer()
 {
-    auto frag_source = read_text("../raytrace-dag.frag");
+    auto frag_source = read_text("../fullscreen.frag");
+    auto vert_source = read_text("../fullscreen.vert");
+    auto comp_source = read_text("../raytrace-dag.comp");
 
     window = create_window(1280, 720, "view-dag");
-    program = create_program(vertex_shader_source, frag_source.c_str());
+    fullscreen_program = create_program(vert_source.c_str(), frag_source.c_str());
+    raytrace_program = create_compute_program(comp_source.c_str());
+    frame = create_texture(1280, 720);
     vbo = create_vertex_buffer_object();
     vao = create_vertex_array_object(vbo);
 }
@@ -243,7 +287,9 @@ Renderer::~Renderer()
 {
     glDeleteVertexArrays(1, &vao);
     glDeleteBuffers(1, &vbo);
-    glDeleteProgram(program);
+    glDeleteTextures(1, &frame);
+    glDeleteProgram(raytrace_program);
+    glDeleteProgram(fullscreen_program);
     glfwDestroyWindow(window);
 }
 
@@ -252,21 +298,28 @@ void Renderer::render()
     int width, height;
     glfwGetFramebufferSize(window, &width, &height);
 
+    glUseProgram(raytrace_program);
+    glDispatchCompute(1280 / 16, 720 / 16, 1);
+
+    glMemoryBarrier(GL_SHADER_IMAGE_ACCESS_BARRIER_BIT);
+
     glViewport(0, 0, width, height);
     glClearColor(0.0, 0.0, 0.0, 1.0);
     glClear(GL_COLOR_BUFFER_BIT);
 
-    glUseProgram(program);
+    glUseProgram(fullscreen_program);
 
+    glActiveTexture(GL_TEXTURE0);
+    glBindTexture(GL_TEXTURE_2D, frame);
     glBindVertexArray(vao);
     glDrawArrays(GL_TRIANGLES, 0, 3);
 
     glfwSwapBuffers(window);
 }
 
-void Renderer::set_uniform(const char* name, Vec3 value)
+void Renderer::set_uniform(GLint location, Vec3 value)
 {
-    GLint location = glGetUniformLocation(program, name);
+    glUseProgram(raytrace_program);
     glUniform3fv(location, 1, value.ptr());
 }
 
@@ -337,8 +390,8 @@ void main_loop(Renderer& renderer)
 
         g_state.position += movement * MOVE_SPEED;
 
-        renderer.set_uniform("u_position", g_state.position);
-        renderer.set_uniform("u_look_dir", look_dir);
+        renderer.set_uniform(1, g_state.position);
+        renderer.set_uniform(2, look_dir);
 
         glfwPollEvents();
         renderer.render();

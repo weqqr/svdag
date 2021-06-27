@@ -1,9 +1,10 @@
 #version 450
 
-out vec4 color;
+layout (local_size_x = 16, local_size_y = 16, local_size_z = 1) in;
+layout (rgba32f, binding = 0) uniform image2D output_image;
 
-uniform vec3 u_position;
-uniform vec3 u_look_dir;
+layout (location = 1) uniform vec3 u_position;
+layout (location = 2) uniform vec3 u_look_dir;
 
 const float PI = 3.1415926;
 const vec3  UP = vec3(0, 1, 0);
@@ -48,11 +49,14 @@ bool intersect(Box box, Ray ray, out float distance, out vec3 normal, in vec3 in
     return (sgn.x != 0) || (sgn.y != 0) || (sgn.z != 0);
 }
 
-void main() {
-    vec2 uv = gl_FragCoord.xy / vec2(WIDTH, HEIGHT);
+void main()
+{
+    ivec2 coord = ivec2(gl_GlobalInvocationID.xy);
 
-    vec3 origin = u_position; //vec3(-5, -5, -5);
-    vec3 look_dir = u_look_dir; // normalize(vec3(1, 1, 1));
+    vec2 uv = vec2(coord) / vec2(WIDTH, HEIGHT);
+
+    vec3 origin = u_position;
+    vec3 look_dir = u_look_dir;
     vec3 U = normalize(cross(UP, -look_dir));
     vec3 V = normalize(cross(-look_dir, U));
 
@@ -73,9 +77,11 @@ void main() {
     vec3 inv_ray_dir = 1.0 / ray.dir;
     bool intersects = intersect(box, ray, distance, normal, inv_ray_dir);
 
+    vec4 color;
     if (intersects)
-	    color = vec4(0.3 + vec3(0.7) * clamp(dot(normal, SUN), 0, 1), 1);
-	else
-	    color = vec4(0, 0, 0, 1);
-}
+        color = vec4(0.3 + vec3(0.7) * clamp(dot(normal, SUN), 0, 1), 1);
+    else
+        color = vec4(0, 0, 0, 1);
 
+    imageStore(output_image, coord, color);
+}
