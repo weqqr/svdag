@@ -1,20 +1,21 @@
 #include <fstream>
 #include <glad/gl.h>
 #include <GLFW/glfw3.h>
-#include <math.h>
-#include <stdio.h>
-#include <stdlib.h>
+#include <iostream>
 #include <string>
+#include "linmath.h"
 
-#define INFO_LOG_SIZE 2048 // 2 kb
+static constexpr size_t INFO_LOG_SIZE = 2048; // 2 kb
+static constexpr float PI = 3.1415926f;
+static constexpr float SENSITIVITY = 0.1f;
+static constexpr float MOVE_SPEED = 0.3f;
 
-static constexpr float PI = 3.1415926;
-static constexpr float SENSITIVITY = 0.1;
-static constexpr float MOVE_SPEED = 0.3;
-
-void panic(const char* message)
+template<typename ...Args>
+void panic(Args&& ...args)
 {
-    fprintf(stderr, "panic: %s\n", message);
+    std::cerr << "panic: ";
+    (std::cerr << ... << args);
+    std::cerr << std::endl;
     exit(1);
 }
 
@@ -22,84 +23,10 @@ std::string read_text(const std::string& path)
 {
     std::ifstream t(path);
     if (!t.good()) {
-        panic("file not found");
+        panic("file not found: ", path);
     }
     std::string str((std::istreambuf_iterator<char>(t)), {});
     return str;
-}
-
-struct Vec3 {
-    float x = 0.0f, y = 0.0f, z = 0.0f;
-    Vec3() = default;
-
-    constexpr Vec3(float x, float y, float z)
-        : x(x)
-        , y(y)
-        , z(z)
-    {
-    }
-
-    static Vec3 from_euler_angles(float pitch, float yaw)
-    {
-        float x = cos(yaw) * cos(pitch);
-        float y = sin(pitch);
-        float z = sin(yaw) * cos(pitch);
-
-        return Vec3(x, y, z);
-    }
-
-    Vec3& operator+=(Vec3 rhs)
-    {
-        x += rhs.x;
-        y += rhs.y;
-        z += rhs.z;
-        return *this;
-    }
-
-    Vec3& operator-=(Vec3 rhs)
-    {
-        x -= rhs.x;
-        y -= rhs.y;
-        z -= rhs.z;
-        return *this;
-    }
-
-    Vec3& operator*(float rhs)
-    {
-        x *= rhs;
-        y *= rhs;
-        z *= rhs;
-        return *this;
-    }
-
-    const float* ptr() const { return &x; }
-};
-
-static constexpr Vec3 UP = Vec3(0, 1, 0);
-
-Vec3 cross(Vec3 lhs, Vec3 rhs)
-{
-    return {
-        lhs.y * rhs.z - lhs.z * rhs.y,
-        lhs.z * rhs.x - lhs.x * rhs.z,
-        lhs.x * rhs.y - lhs.y * rhs.x};
-}
-
-float length(Vec3 lhs)
-{
-    return sqrt(lhs.x * lhs.x + lhs.y * lhs.y + lhs.z * lhs.z);
-}
-
-Vec3 normalize(Vec3 lhs)
-{
-    auto reciprocal = 1.0f / length(lhs);
-    return {lhs.x * reciprocal, lhs.y * reciprocal, lhs.z * reciprocal};
-}
-
-std::ostream& operator<<(std::ostream& stream, const Vec3& vec)
-{
-    stream << "(" << vec.x << ", " << vec.y << ", " << vec.z << ")";
-    return stream;
 }
 
 struct GlobalState {
